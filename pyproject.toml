@@ -1,0 +1,25 @@
+[project]
+name = "subtool"
+version = "0.1.0"
+description = "本地批量音视频转录工具 — 多运行时 STT CLI"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "bang" }]
+dependencies = []
+
+[project.scripts]
+subtool = "subtool.cli.main:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv]
+dev-dependencies = [
+    "pytest>=8.0",
+    "faster-whisper>=1.1",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

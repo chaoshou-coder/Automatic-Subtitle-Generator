@@ -21,3 +21,8 @@ ffmpeg/
 !requirements.txt
 
 mre_silence_*.wav
+
+.venv/
+.DS_Store
+out_*/
+*.part
