@@ -1,12 +1,22 @@
 [project]
 name = "subtool"
 version = "0.1.0"
-description = "本地批量音视频转录工具 — 多运行时 STT CLI"
+description = "本地批量音视频字幕生成工具 — 基于 Qwen3-ASR"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [{ name = "bang" }]
-dependencies = []
+dependencies = [
+    "mlx-audio>=0.4",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+]
+whisper = [
+    "faster-whisper>=1.1",
+]
 
 [project.scripts]
 subtool = "subtool.cli.main:main"
@@ -15,11 +25,13 @@ subtool = "subtool.cli.main:main"
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
-[tool.uv]
-dev-dependencies = [
-    "pytest>=8.0",
-    "faster-whisper>=1.1",
-]
+[tool.hatch.build.targets.wheel]
+packages = ["subtool"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.uv]
+dev-dependencies = [
+    "pytest>=8.0",
+]

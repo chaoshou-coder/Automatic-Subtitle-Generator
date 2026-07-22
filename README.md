@@ -1,115 +1,137 @@
-# 自动批量生成字幕工具
+# subtool — 本地批量音视频字幕生成工具
 
-基于 `faster-whisper` 的本地批量音视频转录脚本，面向普通用户的入口是 `run.py`：自动校验/安装依赖、检测 FFmpeg、可选预下载模型，并交互收集参数后调用执行器批处理。
+基于 Qwen3-ASR 的离线批量转录工具。输入一个文件或目录，输出 SRT 字幕或 TXT 纯文本。全部在本地运行，无需网络。
 
-## 项目简介
+## 特性
 
-这是一个“拿来就能跑”的离线批量转录小工具：输入一个文件或目录，输出对应的字幕文件（SRT）或纯文本（TXT）。
-
-适用场景：
-- 批量为录音/视频生成字幕；
-- 字幕侧重可读/可检索（TXT）或可直接用于视频后期（SRT）；
-- 需要断点续跑：已经生成的输出不会被覆盖（默认跳过）。
-
-## 如何实现
-
-整体分两层：
-- `run.py`：用户入口（交互收集参数 + 依赖/环境引导 + 可选预下载模型）
-- `batch_transcribe.py`：执行器（无交互，纯批处理逻辑）
-
-核心流程（执行器）：
-1) 扫描输入目录/文件，按后缀过滤出可处理的音视频文件  
-2) 加载模型：优先使用本地 `models/` 缓存；没有则按 `faster-whisper` 规则自动下载并缓存  
-3) 对每个文件调用 `faster-whisper` 转录，并在产生 segment 时立刻写入输出（避免长音频堆内存）  
-4) 输出采用 `*.part` 临时文件写入，成功后原子替换为最终文件，避免中断留下半文件  
-5) 断点续传：默认只要任一目标输出存在就跳过该源文件；可用 `--no-skip-existing` 覆盖重生成  
-
-## 文档
-
-- 详细手册：[PROJECT_MANUAL.md](docs/PROJECT_MANUAL.md)
-- 开发者说明：[DEVELOPMENT.md](docs/DEVELOPMENT.md)
-- 变更记录：[CHANGELOG.md](CHANGELOG.md)
+- **极速**：Apple Silicon M5 Pro 上 8.6 分钟视频仅需 8.8 秒（58 倍实时）
+- **多模型**：支持 6 种 Qwen3-ASR 模型（0.6B/1.7B × 4bit/8bit/fp16）
+- **标准输出**：SRT 字幕格式，可直接用于 FFmpeg 软/硬字幕
+- **断点续传**：已处理文件自动跳过
+- **跨平台**：Apple Silicon 原生支持，Linux/Windows 规划中
+- **零配置**：默认模型即开即用
 
 ## 快速开始
 
-### 1) 安装 Python
+### 安装
 
-需要 Python 3.8+（包含 pip）。
-
-### 2) 安装 FFmpeg
-
-请确保 `ffmpeg -version` 可用。安装教程见：[FFMPEG_INSTALL.md](docs/FFMPEG_INSTALL.md)
-
-### 3) 一键运行（推荐）
+需要 Python 3.10+ 和 [FFmpeg](https://ffmpeg.org)。
 
 ```bash
-python run.py
+# 克隆仓库
+git clone https://github.com/chaoshou-coder/Automatic-Subtitle-Generator.git
+cd Automatic-Subtitle-Generator
+
+# 用 uv 创建环境并安装依赖
+uv sync
 ```
 
-## 常用参数（执行器）
+### 下载模型
 
-`run.py` 会在最后调用执行器 `batch_transcribe.py`。高级用户也可以直接运行执行器（无交互）：
+首次使用需要下载模型文件。默认使用 Qwen3-ASR-0.6B-4bit（~680MB）：
+
+```bash
+# 模型会自动下载到 ~/.cache/subtool/models/
+# 也可以手动指定模型路径
+```
+
+### 运行
+
+```bash
+# 交互模式（引导式）
+uv run subtool -i
+
+# 命令行模式
+uv run subtool path/to/video.mp4
+
+# 指定输出目录和格式
+uv run subtool path/to/video.mp4 --format srt,txt --output-dir ./subtitles
+
+# 选择模型大小
+uv run subtool path/to/video.mp4 --model-size 1.7B-8bit
+
+# 预览模式（不执行）
+uv run subtool path/to/video.mp4 --dry-run
+
+# 批量处理目录
+uv run subtool path/to/videos/ --format srt --output-dir ./subtitles
+```
+
+### 使用 pixi
+
+```bash
+pixi install
+pixi run subtool path/to/video.mp4
+```
+
+## CLI 参数
 
 ```text
-python batch_transcribe.py <input_path> [--lang zh|auto] [--format srt|srt,txt]
-                           [--fast] [--beam-size N] [--gpu N] [--cpu-threads N]
-                           [--timestamp-in-txt] [--retries N]
-                           [--output-dir <dir>] [--dry-run] [--skip-existing|--no-skip-existing]
-                           [--config <path>]
+subtool [--version] [--lang LANG] [--format FORMAT]
+        [--timestamp-in-txt] [--output-dir OUTPUT_DIR]
+        [--no-skip-existing] [--backend BACKEND]
+        [--model-size MODEL_SIZE] [--dry-run] [--interactive]
+        [input_path]
 ```
 
-提示：
-- `--lang auto` 表示自动检测语言
-- 强烈建议配合 `--output-dir` 使用，避免在源文件目录产生输出文件
+| 参数 | 说明 | 默认值 |
+|------|------|--------|
+| `input_path` | 输入文件或目录 | （交互输入） |
+| `--lang` | 语言代码 (zh/en/ja/...) 或 auto | auto |
+| `--format` | 输出格式: srt 或 srt,txt | srt |
+| `--timestamp-in-txt` | TXT 输出包含时间戳 | False |
+| `--output-dir` | 输出目录 | 与源文件同级 |
+| `--no-skip-existing` | 不跳过已有输出 | False |
+| `--backend` | STT 后端 | qwen-asr |
+| `--model-size` | 模型大小 | 0.6B-4bit |
+| `--dry-run` | 仅预览不执行 | False |
+| `--interactive, -i` | 交互模式 | False |
 
-## 主要特性
+## 可用模型
 
-- 基于 `faster-whisper` 实现：准确率高、速度快（GPU 加速）
-- 一键引导：依赖校验/自动安装 + 交互配置 + 批处理执行
-- 断点续传：任一目标输出存在即跳过该文件（默认开启，可用 `--no-skip-existing` 覆盖）
-- 输出格式精简：默认 `srt`，可选 `txt`
-- 自动设备选择：有 CUDA 用 CUDA，没有则用 CPU
-- 性能开关：`--fast` 一键将 `beam_size` 降到 1（通常 3–5x 加速）
-- 多卡支持：`--gpu N` 选择使用第 N 张卡
-- 加速下载：`--use-hf-transfer` 开启 `hf_transfer` 加速下载模型
-- 输出目录：`--output-dir` 将字幕集中到独立目录，且保留原目录结构
-- 预览模式：`--dry-run` 先列出将处理的文件与输出路径，避免误操作
+| 模型 | 大小 | 速度 (M5 Pro) | 推荐场景 |
+|------|------|---------------|----------|
+| **0.6B-4bit** ⭐ | 680 MB | 8.8s (58x) | 日常首选 |
+| 0.6B-8bit | 964 MB | 9.2s (56x) | 质量略好 |
+| 0.6B | 1.8 GB | 13.0s (40x) | 全精度小模型 |
+| 1.7B-4bit | 1.5 GB | 12.5s (41x) | 平衡选择 |
+| 1.7B-8bit | 2.3 GB | 18.0s (29x) | 高质量 |
+| 1.7B | 4.4 GB | 28.5s (18x) | 最佳质量 |
 
-## 输出规则
+## 项目结构
 
-- 输出写在源文件同级目录：`video.mp4 -> video.srt`（可选 `video.txt`）
-- 临时文件：转录过程中写入 `*.srt.part / *.txt.part`，成功后原子替换为最终文件（避免中途失败留下半文件）
+```
+subtool/
+├── cli/main.py          # CLI 入口（交互 + 命令行）
+├── core/
+│   ├── protocol.py      # SttRunner Protocol 接口
+│   └── orchestrator.py  # 批量编排器
+├── runners/
+│   └── mlx_qwen3.py     # Qwen3 ASR (MLX) 后端
+├── media/extract.py     # ffmpeg 音频提取
+├── output/
+│   ├── writer.py        # SRT/TXT 原子写入
+│   └── paths.py         # 文件扫描 + 路径计算
+└── hardware/detect.py   # CPU/CUDA/Metal 设备检测
+```
 
-说明：
-- `srt` 是字幕格式，可直接用于 FFmpeg 软/硬字幕。
-- `txt` 是纯文本转写，适合阅读/检索，不是字幕格式。
+## 系统要求
 
-## 示例（执行器）
+- Python 3.10+
+- FFmpeg（命令行可用）
+- macOS ARM64 (Apple Silicon) — 完全支持
+- Linux / Windows — 规划中
+
+## 开发
 
 ```bash
-# 先预览将处理哪些文件，并把输出写到 out_subtitles/
-python batch_transcribe.py "C:\Videos" --lang auto --format srt,txt --dry-run --output-dir out_subtitles
+# 运行测试
+uv run pytest tests/ -v
 
-# 确认无误后执行（默认跳过已有输出）
-python batch_transcribe.py "C:\Videos" --lang auto --format srt,txt --output-dir out_subtitles
-
-# 如需覆盖重生成
-python batch_transcribe.py "C:\Videos" --lang auto --format srt --output-dir out_subtitles --no-skip-existing
+# 性能基准测试
+uv run python benchmark.py
 ```
 
-## 配置文件（.whisperrc）
+## License
 
-在运行目录放置 `.whisperrc`（JSON），执行器会自动读取作为默认参数（命令行参数优先生效）：
-
-```json
-{
-  "lang": "zh",
-  "output_formats": ["srt", "txt"],
-  "fast": true,
-  "skip_existing": true,
-  "output_dir": "out_subtitles"
-}
-```
-
-优先级规则：
-- 命令行参数 > `.whisperrc` 配置 > 内置默认值
+MIT
