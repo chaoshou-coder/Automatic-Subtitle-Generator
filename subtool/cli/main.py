@@ -45,12 +45,13 @@ def format_timedelta(seconds: float) -> str:
     return f"{m:02d}:{s:02d}"
 
 
-def create_runner(name: str, model_path: str | None = None):
+def create_runner(name: str, model_path: str | None = None, model_size: str | None = None):
     """根据名称加载 STT runner。"""
     if name in ("qwen3-asr", "mlx", "qwen", "qwen-asr"):
         from subtool.runners.mlx_qwen3 import MlxQwen3Runner
         return MlxQwen3Runner(
-            model_path=Path(model_path) if model_path else None
+            model_path=Path(model_path) if model_path else None,
+            model_size=model_path,  # CLI 中 --model-size 通过 model_path 传入
         )
     raise ValueError(f"未知后端: {name}")
 
@@ -113,6 +114,10 @@ def interactive_prompt() -> dict:
     dry = input("先预览不执行 (y/N): ").strip().lower()
     dry_run = dry in {"y", "yes"}
 
+    # 模型大小
+    print("\n模型大小: 0.6B-4bit (最快), 0.6B-8bit, 1.7B-4bit, 1.7B-8bit, 1.7B (最准)")
+    raw_size = input("模型 (默认 0.6B-4bit): ").strip() or "0.6B-4bit"
+
     return {
         "input_path": path,
         "language": language,
@@ -122,6 +127,7 @@ def interactive_prompt() -> dict:
         "skip_existing": skip_existing,
         "backend": raw_backend,
         "dry_run": dry_run,
+        "model_size": raw_size,
     }
 
 
@@ -135,6 +141,7 @@ def execute_task(config: dict) -> int:
     timestamp_in_txt: bool = config.get("timestamp_in_txt", False)
     backend_name: str = config.get("backend", "qwen-asr")
     dry_run: bool = config.get("dry_run", False)
+    model_size: str | None = config.get("model_size")
 
     # 检测硬件
     hw = detect_hardware()
@@ -142,7 +149,7 @@ def execute_task(config: dict) -> int:
 
     # 加载 runner
     print(f"加载后端: {backend_name} ...")
-    runner = create_runner(backend_name)
+    runner = create_runner(backend_name, model_size=model_size)
     print(f"后端就绪: {runner.name}")
 
     # 扫描文件
@@ -229,6 +236,7 @@ def main() -> int:
     parser.add_argument("--output-dir", default=None, help="输出目录")
     parser.add_argument("--no-skip-existing", action="store_true", help="不跳过已有输出")
     parser.add_argument("--backend", default="qwen-asr", help="STT 后端 (默认 qwen-asr)")
+    parser.add_argument("--model-size", default=None, help="模型大小: 0.6B-4bit, 0.6B-8bit, 0.6B, 1.7B-4bit, 1.7B-8bit, 1.7B")
     parser.add_argument("--dry-run", action="store_true", help="仅预览不执行")
     parser.add_argument("--interactive", "-i", action="store_true", help="交互模式")
 
@@ -259,6 +267,7 @@ def main() -> int:
             "skip_existing": not args.no_skip_existing,
             "backend": args.backend,
             "dry_run": args.dry_run,
+            "model_size": args.model_size,
         }
 
     return execute_task(config)

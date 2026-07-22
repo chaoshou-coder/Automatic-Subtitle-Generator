@@ -26,14 +26,29 @@ from subtool.core.protocol import (
 from subtool.hardware.detect import detect_hardware
 
 
-DEFAULT_MODEL = Path.home() / "LLM" / "models" / "Qwen3-ASR-1.7B-8bit"
+DEFAULT_MODEL = Path.home() / "LLM" / "asr" / "Qwen3-ASR-0.6B-4bit"
+
+# 可用模型预设
+MODELS = {
+    "0.6B-4bit":  Path.home() / "LLM" / "asr" / "Qwen3-ASR-0.6B-4bit",
+    "0.6B-8bit":  Path.home() / "LLM" / "asr" / "Qwen3-ASR-0.6B-8bit",
+    "0.6B":       Path.home() / "LLM" / "asr" / "Qwen3-ASR-0.6B",
+    "1.7B-4bit":  Path.home() / "LLM" / "asr" / "Qwen3-ASR-1.7B-4bit",
+    "1.7B-8bit":  Path.home() / "LLM" / "asr" / "Qwen3-ASR-1.7B-8bit",
+    "1.7B":       Path.home() / "LLM" / "asr" / "Qwen3-ASR-1.7B",
+}
 
 
 class MlxQwen3Runner:
     """基于 mlx-audio CLI 的 Qwen3 ASR runner。"""
 
-    def __init__(self, model_path: Path | None = None) -> None:
-        self._model_path = model_path or DEFAULT_MODEL
+    def __init__(self, model_path: Path | None = None, model_size: str | None = None) -> None:
+        if model_path is not None:
+            self._model_path = model_path
+        elif model_size is not None and model_size in MODELS:
+            self._model_path = MODELS[model_size]
+        else:
+            self._model_path = DEFAULT_MODEL
 
     @property
     def name(self) -> str:

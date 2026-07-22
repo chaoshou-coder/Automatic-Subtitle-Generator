@@ -26,3 +26,10 @@ mre_silence_*.wav
 .DS_Store
 out_*/
 *.part
+
+# 测试文件
+*.wav
+*.mp4
+*.mkv
+*.mov
+benchmark.py
